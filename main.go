@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strings"
 )
 
 func main() {
@@ -17,21 +19,23 @@ func main() {
 
 func getDirectory(prompt string) string {
 	directory := ""
-	fmt.Print(prompt)
+	fmt.Print(prompt + ": ")
 	fmt.Scanln(&directory)
 	return directory
 }
 
 func getText(prompt string) string {
 	text := ""
-	fmt.Print(prompt)
+	fmt.Print(prompt + ": ")
 	fmt.Scanln(&text)
 	return text
 }
 
 func cloneSolution(indir string, outdir string, replace string, inject string) {
 
-	// any solution level stuff before...
+	// ensure the output directory is empty
+
+	// begin cloning
 	cloneFolder(indir, outdir, replace, inject)
 }
 
@@ -40,22 +44,40 @@ func cloneFolder(sourcedir string, targetdir string, replace string, inject stri
 	directories, files := getDirectoryItems(sourcedir)
 
 	for _, name := range directories {
-		sourcesubdir := sourcedir + "\\" + name
-		targetsubdir := "" // need to substitute text
-		// create the new targetsubdir
-		cloneFolder(sourcesubdir, targetsubdir, replace, inject)
+		// ignore the VS build output directories
+		if (name != "bin" && name != "obj") {
+			sourcesubdir := sourcedir + "\\" + name
+			targetsubdir := targetdir + "\\" + name
+			targetsubdir = strings.Replace(targetsubdir, replace, inject, -1)
+			os.Mkdir(targetsubdir, os.ModeDir)
+			cloneFolder(sourcesubdir, targetsubdir, replace, inject)
+		}
 	}
 
 	for _, name := range files {
-		sourcefile := sourcedir + "\\" + name
-		cloneFile(sourcefile, targetdir, replace, inject)
+		if (!strings.HasSuffix(name, ".vspscc") && !strings.HasSuffix(name, ".user")) {
+			cloneFile(sourcedir, targetdir, name, replace, inject)
+		}
 	}
 }
 
-func cloneFile(sourcefile string, targetDir string, replace string, inject string) {
-	// copy file to target directory
-	// replace text in file name
-	// replace text in file content
+func cloneFile(sourcedir string, targetdir string, filename string, replace string, inject string) {
+
+	// construnct full file paths
+	sourcefile := sourcedir + "\\" + filename
+	targetfile := targetdir + "\\" + filename
+	targetfile = strings.Replace(targetfile, replace, inject, -1)
+
+	// read the content of the source file and convert to string
+	contentbytes, _ := ioutil.ReadFile(sourcefile)
+	contentstring := string(contentbytes)
+
+	// do string substitution in file content and convert back to bytes
+	contentstring = strings.Replace(contentstring, replace, inject, -1)
+	contentbytes = []byte(contentstring)
+
+	// create the new destination file
+	ioutil.WriteFile(targetfile, contentbytes, os.ModePerm)
 }
 
 func getDirectoryItems(path string) ([]string, []string) {
